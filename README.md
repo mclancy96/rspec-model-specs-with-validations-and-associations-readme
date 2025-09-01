@@ -1,12 +1,13 @@
-# RSpec: Model Specs with Validations & Associations
 
-Welcome to Lesson 20! In this lesson, we're going to take a deep dive into writing RSpec model specs for ActiveRecord validations and associations in Rails. We'll also introduce FactoryBot, your new best friend for setting up test data. If you know Ruby and Rails but are new to automated testing, this is your on-ramp to writing robust, maintainable, and DRY model specs. We'll explain every concept in multiple ways, show you lots of code examples (with file path comments!), and give you practice prompts to reinforce your learning. Let's get started!
+# RSpec: Model Specs with Validations & Associations (Book & BookReview Edition)
+
+Welcome to Lesson 20! In this lesson, you'll learn how to write robust model specs for validations and associations using a real Rails/ActiveRecord setup with a Book/BookReview domain. All examples use Rails models, migrations, and RSpec best practices, so you can focus on realistic, hands-on learning. You'll see how to test validations, associations, and more, with clear, practical examples.
 
 ---
 
 ## Why Test Models?
 
-Models are the heart and soul of your Rails app. They:
+Models are the heart and soul of your app. They:
 
 - Hold your business logic
 - Enforce validations (rules about what data is allowed)
@@ -14,7 +15,7 @@ Models are the heart and soul of your Rails app. They:
 
 If your models are wrong, your whole app can break! Testing models ensures:
 
-- Your data stays clean (no missing usernames, no orphaned records)
+- Your data stays clean (no missing reviews, no orphaned books)
 - Your app behaves as expected
 - You catch bugs before they reach production
 
@@ -22,208 +23,184 @@ If your models are wrong, your whole app can break! Testing models ensures:
 
 ---
 
-## Setting Up: FactoryBot (Test Data, the Easy Way)
+## Getting Hands-On
 
-Writing tests is a lot easier when you can quickly create test data. That's where FactoryBot comes in! Instead of writing out every attribute by hand, you define a factory once and use it everywhere.
+> **Note:** This lesson uses [FactoryBot](https://github.com/thoughtbot/factory_bot) to help you quickly create test data in your specs. You will learn about FactoryBot in detail in Lesson 23. For now, you can use the provided factories as shown in the examples below—no need to understand all the details yet!
 
-### Step 1: Add FactoryBot to Your Gemfile
+Ready to practice? Here’s how to get started:
 
-```ruby
-# /Gemfile
-gem 'factory_bot_rails'
-```
+1. **Fork and clone this repo to your own GitHub account.**
+2. **Install dependencies:**
 
-### Step 2: Install the Gem
+    ```zsh
+    bundle install
+    ```
 
-```zsh
-# Terminal
-bundle install
-```
+3. **Set up the database:**
 
-### Step 3: Configure RSpec to Use FactoryBot
+    ```zsh
+    bin/rails db:migrate
+    ```
 
-```ruby
-# /spec/rails_helper.rb
-RSpec.configure do |config|
-  config.include FactoryBot::Syntax::Methods
-end
-```
+4. **Run the specs:**
 
-Now you can use `build(:user)` and `create(:user)` in your specs without prefixing with `FactoryBot.` every time.
+    ```zsh
+    bin/rspec
+    ```
+
+5. **Explore the code:**
+
+   - All lesson code uses the Book and BookReview domain (see `app/models/`, `db/migrate/`, `spec/models/`, and `spec/factories/`).
+   - Review the examples for validations and associations.
+
+6. **Implement the pending specs:**
+
+   - Open `spec/models/book_spec.rb`, `spec/models/book_review_spec.rb`, and `spec/model_spec.rb` and look for specs marked as `pending`.
+   - Implement the real methods in the Rails models (`app/models/book.rb`, `app/models/book_review.rb`) as needed so the pending specs pass.
+
+7. **Re-run the specs** to verify your changes!
+
+**Challenge:** Try writing your own spec for a new validation or association on Book or BookReview, or add a new model and test it.
 
 ---
 
 ## Writing Specs for Validations
 
-Validations are rules you set on your models to make sure your data is correct. For example, you might require every user to have a username and email, and that usernames are unique.
+Validations are rules you set on your models to make sure your data is correct. For example, you might require every book review to have content and a rating between 1 and 5.
 
-### Example User Model with Validations
+### Example BookReview Model with Validations (Rails)
 
 ```ruby
-# /app/models/user.rb
-class User < ApplicationRecord
-  validates :username, presence: true, uniqueness: true
-  validates :email, presence: true
+# app/models/book_review.rb
+class BookReview < ApplicationRecord
+  belongs_to :book
+  validates :content, presence: true
+  validates :rating, presence: true, inclusion: { in: 1..5 }
 end
 ```
 
-### How to Test Validations
+### How to Test Validations (with Shoulda Matchers)
 
 You want to check:
 
 - The model is valid when all required attributes are present
 - The model is invalid when required attributes are missing
-- The model is invalid when uniqueness is violated
+- The model is invalid when the rating is out of range
 
 #### Example Spec for Validations
 
 ```ruby
-# /spec/models/user_spec.rb
+# spec/models/book_review_spec.rb
 require 'rails_helper'
 
-RSpec.describe User, type: :model do
+RSpec.describe BookReview, type: :model do
+  it { should validate_presence_of(:content) }
+  it { should validate_presence_of(:rating) }
+  it { should validate_inclusion_of(:rating).in_range(1..5) }
+
   it "is valid with valid attributes" do
-    user = build(:user)
-    expect(user).to be_valid
+    review = FactoryBot.build(:book_review)
+    expect(review).to be_valid
   end
 
-  it "is invalid without a username" do
-    user = build(:user, username: nil)
-    expect(user).not_to be_valid
-    expect(user.errors[:username]).to include("can't be blank")
+  it "is invalid without content" do
+    review = FactoryBot.build(:book_review, content: nil)
+    expect(review).not_to be_valid
+    expect(review.errors[:content]).to include("can't be blank")
   end
 
-  it "is invalid without an email" do
-    user = build(:user, email: nil)
-    expect(user).not_to be_valid
-    expect(user.errors[:email]).to include("can't be blank")
-  end
-
-  it "is invalid with a duplicate username (case-sensitive)" do
-    create(:user, username: "bob")
-    user = build(:user, username: "bob")
-    expect(user).not_to be_valid
-    expect(user.errors[:username]).to include("has already been taken")
-    # Output example:
-    # puts user.errors.full_messages
-    # => ["Username has already been taken"]
-  end
-
-  it "is invalid with a duplicate username (case-insensitive)" do
-    create(:user, username: "bob")
-    user = build(:user, username: "BOB")
-    # If your model uses: validates :username, uniqueness: { case_sensitive: false }
-    expect(user).not_to be_valid
-    expect(user.errors[:username]).to include("has already been taken")
+  it "is invalid with rating out of range" do
+    review = FactoryBot.build(:book_review, rating: 6)
+    expect(review).not_to be_valid
+    expect(review.errors[:rating]).to include("is not included in the list")
   end
 end
-```
-
-**What happens?**
-
-- The first test passes if the factory creates a valid user.
-- The next tests check that missing or duplicate data triggers validation errors.
-
-**Example Output:**
-
-```zsh
-User
-  is valid with valid attributes
-  is invalid without a username
-  is invalid without an email
-  is invalid with a duplicate username
-
-Finished in 0.0123 seconds (files took 0.12345 seconds to load)
-4 examples, 0 failures
 ```
 
 ---
 
 ## Writing Specs for Associations
 
-Associations define how your models relate to each other. For example, a user might have many posts, or a post might belong to a user.
+Associations define how your models relate to each other. For example, a book might have many reviews, and a review belongs to a book.
 
-### Example User Model with Association
+### Example Book and BookReview Models with Associations (Rails)
 
 ```ruby
-# /app/models/user.rb
-class User < ApplicationRecord
-  has_many :posts
+# app/models/book.rb
+class Book < ApplicationRecord
+  has_many :book_reviews, dependent: :destroy
+  validates :title, presence: true
+  validates :author, presence: true
+end
+
+# app/models/book_review.rb
+class BookReview < ApplicationRecord
+  belongs_to :book
+  validates :content, presence: true
+  validates :rating, presence: true, inclusion: { in: 1..5 }
 end
 ```
 
-### How to Test Associations
+### How to Test Associations (with Shoulda Matchers)
 
 You want to check:
 
-- The association exists (e.g., `has_many :posts`)
-- The association works as expected (e.g., adding/removing related records)
+- The association exists (e.g., a book has many reviews)
+- The association works as expected (e.g., adding/removing related reviews)
 
-#### Example Spec for Association (Manual and Shoulda-Matchers)
+#### Example Spec for Associations
 
 ```ruby
-# /spec/models/user_spec.rb
-RSpec.describe User, type: :model do
-  # Manual check
-  it "has many posts (manual)" do
-    assoc = described_class.reflect_on_association(:posts)
-    expect(assoc.macro).to eq :has_many
+# spec/models/book_spec.rb
+require 'rails_helper'
+
+RSpec.describe Book, type: :model do
+  it { should have_many(:book_reviews).dependent(:destroy) }
+
+  it "can have many reviews" do
+    book = FactoryBot.create(:book)
+    review1 = FactoryBot.create(:book_review, book: book)
+    review2 = FactoryBot.create(:book_review, book: book)
+    expect(book.book_reviews).to contain_exactly(review1, review2)
+    expect(review1.book).to eq(book)
+    expect(review2.book).to eq(book)
   end
-
-  # Shoulda-Matchers (if installed)
-  it { should have_many(:posts) }
-end
-```
-
-#### Example: Testing the Relationship in Action
-
-```ruby
-# /spec/models/user_spec.rb
-it "can have many posts" do
-  user = create(:user)
-  post1 = create(:post, user: user)
-  post2 = create(:post, user: user)
-  expect(user.posts).to include(post1, post2)
 end
 ```
 
 ---
 
-## Using FactoryBot
+## Using FactoryBot for Test Data
 
-Factories are blueprints for creating test data. Instead of writing out every attribute, you define a factory once and use it everywhere.
-
-### Example User Factory
+In this Rails lesson, we use FactoryBot to create test data for our specs. Factories are defined in `spec/factories/`:
 
 ```ruby
-# /spec/factories/users.rb
+# spec/factories/books.rb
 FactoryBot.define do
-  factory :user do
-    username { "testuser" }
-    email { "test@example.com" }
+  factory :book do
+    title { "Sample Book" }
+    author { "Sample Author" }
+  end
+end
+
+# spec/factories/book_reviews.rb
+FactoryBot.define do
+  factory :book_review do
+    content { "Great book!" }
+    rating { 5 }
+    association :book
   end
 end
 ```
 
-### Example Post Factory
+> **Reminder:** If you haven't seen FactoryBot before, don't worry! It's a tool for creating test data, and it's already set up for you in this lesson. You'll get a full introduction in Lesson 23.
+
+Use these factories in your specs to keep your tests DRY and focused:
 
 ```ruby
-# /spec/factories/posts.rb
-FactoryBot.define do
-  factory :post do
-    title { "A blog post" }
-    content { "Lorem ipsum..." }
-    association :user # This automatically creates and associates a user for each post
-  end
-end
+let(:book) { FactoryBot.create(:book) }
+let(:review) { FactoryBot.create(:book_review, book: book) }
 ```
-
-**Tip:** When you use `association :user` in a factory, FactoryBot automatically builds or creates a user and sets up the relationship for you. That's why `create(:post)` gives you a post with a valid user.
-
-**Isolation Reminder:**
-
-- `build(:user)` and `build(:post)` create objects in memory (do not hit the database).
-- `create(:user)` and `create(:post)` save objects to the database (slower, but needed for most association tests).
 
 ---
 
@@ -231,10 +208,10 @@ end
 
 Try these exercises to reinforce your learning:
 
-1. Write a spec to test a model validation for presence of a field. What happens if you remove the validation from the model?
-2. Write a spec to test a uniqueness validation. How would you test for case-insensitive uniqueness?
-3. Write a spec to test a `belongs_to` or `has_many` association. How would you test a `has_one` or `has_and_belongs_to_many`?
-4. Create a factory for a model and use it in your specs. How does FactoryBot help keep your tests DRY?
+1. Write a spec to test a model validation for presence of content or rating. What happens if you remove the validation from the model?
+2. Write a spec to test that a review cannot be added to two books. How would you enforce this rule in Rails?
+3. Write a spec to test a `has_many` or `belongs_to` association. How would you test a `has_one` or a more complex relationship?
+4. Create a factory for building reviews or books and use it in your specs. How does this help keep your tests DRY?
 5. Why is it important to test both validations and associations in your models?
 
 Reflect: What could go wrong in your app if you didn't test your models?
