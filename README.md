@@ -1,7 +1,7 @@
 
 # RSpec: Model Specs with Validations & Associations (Book & BookReview Edition)
 
-Welcome to Lesson 20! In this lesson, you'll learn how to write robust model specs for validations and associations using a real Rails/ActiveRecord setup with a Book/BookReview domain. All examples use Rails models, migrations, and RSpec best practices, so you can focus on realistic, hands-on learning. You'll see how to test validations, associations, and more, with clear, practical examples.
+In this lesson, you'll learn how to write robust model specs for validations and associations using a real Rails/ActiveRecord setup with a Book/BookReview domain. All examples use Rails models, migrations, and RSpec best practices, so you can focus on realistic, hands-on learning. You'll see how to test validations, associations, and more, with clear, practical examples.
 
 ---
 
